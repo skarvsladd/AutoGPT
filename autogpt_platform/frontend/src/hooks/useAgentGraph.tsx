@@ -24,6 +24,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { InputItem } from "@/components/RunnerUIWrapper";
 import { GraphMeta } from "@/lib/autogpt-server-api";
 import { default as NextLink } from "next/link";
+import { useOnboarding } from "@/components/onboarding/onboarding-provider";
 
 const ajv = new Ajv({ strict: false, allErrors: true });
 
@@ -77,6 +78,7 @@ export default function useAgentGraph(
     useState(false);
   const [nodes, setNodes] = useState<CustomNode[]>([]);
   const [edges, setEdges] = useState<CustomEdge[]>([]);
+  const { state, completeStep } = useOnboarding();
 
   const api = useMemo(
     () => new BackendAPI(process.env.NEXT_PUBLIC_AGPT_SERVER_URL!),
@@ -153,10 +155,11 @@ export default function useAgentGraph(
       setAgentDescription(graph.description);
 
       setNodes((prevNodes) => {
-        const newNodes = graph.nodes.map((node) => {
+        const _newNodes = graph.nodes.map((node) => {
           const block = availableNodes.find(
             (block) => block.id === node.block_id,
           )!;
+          if (!block) return null;
           const prevNode = prevNodes.find((n) => n.id === node.id);
           const flow =
             block.uiType == BlockUIType.AGENT
@@ -199,6 +202,7 @@ export default function useAgentGraph(
           };
           return newNode;
         });
+        const newNodes = _newNodes.filter((n) => n !== null);
         setEdges(() =>
           graph.links.map((link) => {
             const adjustedSourceName = link.source_name?.startsWith("tools_^_")
@@ -411,7 +415,10 @@ export default function useAgentGraph(
           ) {
             return;
           }
-          console.warn("Error", error);
+          console.warn(`Error in ${node.data.blockType}: ${error}`, {
+            data: inputData,
+            schema: node.data.inputSchema,
+          });
           errorMessage = error.message || "Invalid input";
           if (path && error.message) {
             const key = path.slice(1);
@@ -571,6 +578,9 @@ export default function useAgentGraph(
             path.set("flowVersion", savedAgent.version.toString());
             path.set("flowExecutionID", graphExecution.graph_exec_id);
             router.push(`${pathname}?${path.toString()}`);
+            if (state?.completedSteps.includes("BUILDER_SAVE_AGENT")) {
+              completeStep("BUILDER_RUN_AGENT");
+            }
           })
           .catch((error) => {
             const errorMessage =
@@ -631,7 +641,10 @@ export default function useAgentGraph(
           activeExecutionID: flowExecutionID,
         });
       }
-      setUpdateQueue((prev) => [...prev, ...execution.node_executions]);
+      setUpdateQueue((prev) => {
+        if (!execution.node_executions) return prev;
+        return [...prev, ...execution.node_executions];
+      });
 
       // Track execution until completed
       const pendingNodeExecutions: Set<string> = new Set();
@@ -958,6 +971,7 @@ export default function useAgentGraph(
   const saveAgent = useCallback(async () => {
     try {
       await _saveAgent();
+      completeStep("BUILDER_SAVE_AGENT");
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);

@@ -53,6 +53,7 @@ import {
   UserOnboarding,
   ReviewSubmissionRequest,
   SubmissionStatus,
+  CredentialsMetaInput,
 } from "./types";
 import { createBrowserClient } from "@supabase/ssr";
 import getServerSupabase from "../supabase/getServerSupabase";
@@ -180,7 +181,9 @@ export default class BackendAPI {
     return this._get("/onboarding");
   }
 
-  updateUserOnboarding(onboarding: Partial<UserOnboarding>): Promise<void> {
+  updateUserOnboarding(
+    onboarding: Omit<Partial<UserOnboarding>, "rewardedFor">,
+  ): Promise<void> {
     return this._request("PATCH", "/onboarding", onboarding);
   }
 
@@ -205,7 +208,7 @@ export default class BackendAPI {
     return this._get(`/graphs`);
   }
 
-  getGraph(
+  async getGraph(
     id: GraphID,
     version?: number,
     for_export?: boolean,
@@ -217,7 +220,9 @@ export default class BackendAPI {
     if (for_export !== undefined) {
       query["for_export"] = for_export;
     }
-    return this._get(`/graphs/${id}`, query);
+    const graph = await this._get(`/graphs/${id}`, query);
+    if (for_export) delete graph.user_id;
+    return graph;
   }
 
   getGraphAllVersions(id: GraphID): Promise<Graph[]> {
@@ -247,17 +252,25 @@ export default class BackendAPI {
   executeGraph(
     id: GraphID,
     version: number,
-    inputData: { [key: string]: any } = {},
+    inputs: { [key: string]: any } = {},
+    credentials_inputs: { [key: string]: CredentialsMetaInput } = {},
   ): Promise<{ graph_exec_id: GraphExecutionID }> {
-    return this._request("POST", `/graphs/${id}/execute/${version}`, inputData);
+    return this._request("POST", `/graphs/${id}/execute/${version}`, {
+      inputs,
+      credentials_inputs,
+    });
   }
 
   getExecutions(): Promise<GraphExecutionMeta[]> {
-    return this._get(`/executions`);
+    return this._get(`/executions`).then((results) =>
+      results.map(parseGraphExecutionTimestamps),
+    );
   }
 
   getGraphExecutions(graphID: GraphID): Promise<GraphExecutionMeta[]> {
-    return this._get(`/graphs/${graphID}/executions`);
+    return this._get(`/graphs/${graphID}/executions`).then((results) =>
+      results.map(parseGraphExecutionTimestamps),
+    );
   }
 
   async getGraphExecutionInfo(
@@ -265,10 +278,7 @@ export default class BackendAPI {
     runID: GraphExecutionID,
   ): Promise<GraphExecution> {
     const result = await this._get(`/graphs/${graphID}/executions/${runID}`);
-    result.node_executions = result.node_executions.map(
-      parseNodeExecutionResultTimestamps,
-    );
-    return result;
+    return parseGraphExecutionTimestamps<GraphExecution>(result);
   }
 
   async stopGraphExecution(
@@ -279,10 +289,7 @@ export default class BackendAPI {
       "POST",
       `/graphs/${graphID}/executions/${runID}/stop`,
     );
-    result.node_executions = result.node_executions.map(
-      parseNodeExecutionResultTimestamps,
-    );
-    return result;
+    return parseGraphExecutionTimestamps<GraphExecution>(result);
   }
 
   async deleteGraphExecution(runID: GraphExecutionID): Promise<void> {
@@ -828,6 +835,12 @@ export default class BackendAPI {
     });
   }
 
+  subscribeToGraphExecutions(graphID: GraphID): Promise<void> {
+    return this.sendWebSocketMessage("subscribe_graph_executions", {
+      graph_id: graphID,
+    });
+  }
+
   async sendWebSocketMessage<M extends keyof WebsocketMessageTypeMap>(
     method: M,
     data: WebsocketMessageTypeMap[M],
@@ -904,7 +917,7 @@ export default class BackendAPI {
           if (message.method === "node_execution_event") {
             message.data = parseNodeExecutionResultTimestamps(message.data);
           } else if (message.method == "graph_execution_event") {
-            message.data = parseGraphExecutionMetaTimestamps(message.data);
+            message.data = parseGraphExecutionTimestamps(message.data);
           }
           this.wsMessageHandlers[message.method]?.forEach((handler) =>
             handler(message.data),
@@ -973,7 +986,8 @@ type GraphCreateRequestBody = {
 
 type WebsocketMessageTypeMap = {
   subscribe_graph_execution: { graph_exec_id: GraphExecutionID };
-  graph_execution_event: GraphExecutionMeta;
+  subscribe_graph_executions: { graph_id: GraphID };
+  graph_execution_event: GraphExecution;
   node_execution_event: NodeExecutionResult;
   heartbeat: "ping" | "pong";
 };
@@ -994,11 +1008,16 @@ type _PydanticValidationError = {
 
 /* *** HELPER FUNCTIONS *** */
 
-function parseGraphExecutionMetaTimestamps(result: any): GraphExecutionMeta {
-  return _parseObjectTimestamps<GraphExecutionMeta>(result, [
-    "started_at",
-    "ended_at",
-  ]);
+function parseGraphExecutionTimestamps<
+  T extends GraphExecutionMeta | GraphExecution,
+>(result: any): T {
+  const fixed = _parseObjectTimestamps<T>(result, ["started_at", "ended_at"]);
+  if ("node_executions" in fixed && fixed.node_executions) {
+    fixed.node_executions = fixed.node_executions.map(
+      parseNodeExecutionResultTimestamps,
+    );
+  }
+  return fixed;
 }
 
 function parseNodeExecutionResultTimestamps(result: any): NodeExecutionResult {

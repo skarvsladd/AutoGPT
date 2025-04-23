@@ -17,6 +17,7 @@ from typing import (
 import jsonref
 import jsonschema
 from prisma.models import AgentBlock
+from prisma.types import AgentBlockCreateInput
 from pydantic import BaseModel
 
 from backend.data.model import NodeExecutionStats
@@ -27,6 +28,7 @@ from backend.util.settings import Config
 from .model import (
     ContributorDetails,
     Credentials,
+    CredentialsFieldInfo,
     CredentialsMetaInput,
     is_credentials_field_name,
 )
@@ -121,20 +123,25 @@ class BlockSchema(BaseModel):
         return cls.validate_data(data)
 
     @classmethod
+    def get_field_schema(cls, field_name: str) -> dict[str, Any]:
+        model_schema = cls.jsonschema().get("properties", {})
+        if not model_schema:
+            raise ValueError(f"Invalid model schema {cls}")
+
+        property_schema = model_schema.get(field_name)
+        if not property_schema:
+            raise ValueError(f"Invalid property name {field_name}")
+
+        return property_schema
+
+    @classmethod
     def validate_field(cls, field_name: str, data: BlockInput) -> str | None:
         """
         Validate the data against a specific property (one of the input/output name).
         Returns the validation error message if the data does not match the schema.
         """
-        model_schema = cls.jsonschema().get("properties", {})
-        if not model_schema:
-            return f"Invalid model schema {cls}"
-
-        property_schema = model_schema.get(field_name)
-        if not property_schema:
-            return f"Invalid property name {field_name}"
-
         try:
+            property_schema = cls.get_field_schema(field_name)
             jsonschema.validate(json.to_dict(data), property_schema)
             return None
         except jsonschema.ValidationError as e:
@@ -195,6 +202,15 @@ class BlockSchema(BaseModel):
                     CredentialsMetaInput,
                 )
             )
+        }
+
+    @classmethod
+    def get_credentials_fields_info(cls) -> dict[str, CredentialsFieldInfo]:
+        return {
+            field_name: CredentialsFieldInfo.model_validate(
+                cls.get_field_schema(field_name), by_alias=True
+            )
+            for field_name in cls.get_credentials_fields().keys()
         }
 
     @classmethod
@@ -475,12 +491,12 @@ async def initialize_blocks() -> None:
         )
         if not existing_block:
             await AgentBlock.prisma().create(
-                data={
-                    "id": block.id,
-                    "name": block.name,
-                    "inputSchema": json.dumps(block.input_schema.jsonschema()),
-                    "outputSchema": json.dumps(block.output_schema.jsonschema()),
-                }
+                data=AgentBlockCreateInput(
+                    id=block.id,
+                    name=block.name,
+                    inputSchema=json.dumps(block.input_schema.jsonschema()),
+                    outputSchema=json.dumps(block.output_schema.jsonschema()),
+                )
             )
             continue
 
@@ -503,6 +519,7 @@ async def initialize_blocks() -> None:
             )
 
 
-def get_block(block_id: str) -> Block | None:
+# Note on the return type annotation: https://github.com/microsoft/pyright/issues/10281
+def get_block(block_id: str) -> Block[BlockSchema, BlockSchema] | None:
     cls = get_blocks().get(block_id)
     return cls() if cls else None
