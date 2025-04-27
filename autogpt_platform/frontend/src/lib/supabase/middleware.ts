@@ -11,6 +11,8 @@ const PROTECTED_PAGES = [
   "/monitoring",
 ];
 const ADMIN_PAGES = ["/admin"];
+// Explicitly define public pages that should never require authentication
+const PUBLIC_PAGES = ["/marketplace"];
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -58,6 +60,16 @@ export async function updateSession(request: NextRequest) {
       data: { user },
       error,
     } = await supabase.auth.getUser();
+
+    // Check if this is a public page that should never require auth
+    const isPublicPage = PUBLIC_PAGES.some(page => 
+      request.nextUrl.pathname.startsWith(page)
+    );
+    
+    if (isPublicPage) {
+      // Allow access to public pages without authentication
+      return supabaseResponse;
+    }
 
     // Get the user role
     const userRole = user?.role;

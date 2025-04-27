@@ -48,10 +48,13 @@ export const AgentsSection: React.FC<AgentsSectionProps> = ({
   return (
     <div className="flex flex-col items-center justify-center">
       <div className="w-full max-w-[1360px]">
-        <div
-          className={`mb-[${margin}] font-poppins text-lg font-semibold text-[#282828] dark:text-neutral-200`}
-        >
-          {sectionTitle}
+        <div className="mb-8">
+          <div className="font-poppins text-lg font-semibold text-[#282828] dark:text-neutral-200">
+            {sectionTitle}
+          </div>
+          <p className="mt-2 text-neutral-600 dark:text-neutral-400">
+            Popular AI agents that are frequently used by the community
+          </p>
         </div>
         {!displayedAgents || displayedAgents.length === 0 ? (
           <div className="text-center text-gray-500 dark:text-gray-400">

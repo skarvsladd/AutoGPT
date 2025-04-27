@@ -47,9 +47,14 @@ export const FeaturedSection: React.FC<FeaturedSectionProps> = ({
 
   return (
     <section className="w-full">
-      <h2 className="mb-8 font-poppins text-2xl font-semibold leading-7 text-neutral-800 dark:text-neutral-200">
-        Featured agents
-      </h2>
+      <div className="mb-8">
+        <h2 className="font-poppins text-2xl font-semibold leading-7 text-neutral-800 dark:text-neutral-200">
+          My Favorite Agents
+        </h2>
+        <p className="mt-2 text-neutral-600 dark:text-neutral-400">
+          Handpicked AI agents that I've found most useful in my daily workflow
+        </p>
+      </div>
 
       <Carousel
         opts={{

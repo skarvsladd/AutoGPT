@@ -100,41 +100,43 @@ async function getStoreData() {
   }
 }
 
-// FIX: Correct metadata
+// Updated metadata with your custom branding
 export const metadata: Metadata = {
-  title: "Marketplace - NextGen AutoGPT",
-  description: "Find and use AI Agents created by our community",
-  applicationName: "NextGen AutoGPT Store",
-  authors: [{ name: "AutoGPT Team" }],
+  title: "My AI Marketplace - Custom AutoGPT",
+  description: "A personalized collection of AI agents for everyone, no login required",
+  applicationName: "My Custom AutoGPT Platform",
+  authors: [{ name: "Your Name" }],
   keywords: [
     "AI agents",
     "automation",
     "artificial intelligence",
     "AutoGPT",
     "marketplace",
+    "personal collection",
+    "no login required",
   ],
   robots: {
     index: true,
     follow: true,
   },
   openGraph: {
-    title: "Marketplace - NextGen AutoGPT",
-    description: "Find and use AI Agents created by our community",
+    title: "My AI Marketplace - Custom AutoGPT",
+    description: "A personalized collection of AI agents for everyone, no login required",
     type: "website",
-    siteName: "NextGen AutoGPT Store",
+    siteName: "My Custom AutoGPT Platform",
     images: [
       {
         url: "/images/store-og.png",
         width: 1200,
         height: 630,
-        alt: "NextGen AutoGPT Store",
+        alt: "My Custom AutoGPT Platform",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Marketplace - NextGen AutoGPT",
-    description: "Find and use AI Agents created by our community",
+    title: "My AI Marketplace - Custom AutoGPT",
+    description: "A personalized collection of AI agents for everyone, no login required",
     images: ["/images/store-twitter.png"],
   },
   icons: {
@@ -165,9 +167,9 @@ export default async function Page({}: {}) {
         />
         <Separator className="mb-[25px] mt-[60px]" />
         <BecomeACreator
-          title="Become a Creator"
-          description="Join our ever-growing community of hackers and tinkerers"
-          buttonText="Become a Creator"
+          title="Join My Custom AI Community"
+          description="Start building your own AI agents and share them with others"
+          buttonText="Get Started"
         />
       </main>
     </div>
